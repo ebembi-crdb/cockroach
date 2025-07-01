@@ -1,0 +1,39 @@
+# .github/workflows/check-release-notes.yml
+
+name: Check Release Notes
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check_release_notes:
+    name: Validate release notes in every commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Fetch target branch
+        run: git fetch origin master
+
+      - name: Validate release-note format
+        run: |
+          # Allow “Release note: none” (case-insensitive) anywhere in the commit message
+          RE_REGEX='(?i)release note:\s*none'
+
+          for sha in $(git rev-list origin/master..HEAD); do
+            msg=$(git show -s --format=%B $sha)
+
+            # Pass if the commit message contains “Release note: none”
+            echo "$msg" | grep -Pqi "$RE_REGEX" && continue
+
+            # Otherwise, fail
+            echo "::error::Commit $sha has invalid or missing release note."
+            echo "Please include 'Release note' in your commit message."
+            exit 1
+          done
+
+          echo "✅ All release notes are valid."
